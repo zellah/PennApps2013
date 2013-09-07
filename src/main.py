@@ -7,6 +7,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required
 from sqlalchemy.orm import class_mapper
+from flask_security.core import current_user
 
 dthandler = lambda obj: obj.isoformat() if isinstance(obj, datetime.datetime) else None
 # Create app
@@ -42,7 +43,7 @@ friends = db.Table('friends',
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True)
-    names = db.Column(db.String(255))
+    name = db.Column(db.String(255))
     password = db.Column(db.String(255))
     active = db.Column(db.Boolean())
     created = db.Column(db.DateTime(), default = datetime.datetime.now)
@@ -329,9 +330,14 @@ def edit_user(userid):
 
 # Views
 @app.route('/')
-@login_required
 def home():
-    return render_template('home.html')
+    return render_template('home.html', user=current_user)
+
+@app.route('/event/<id>')
+@login_required
+def event(id):
+    return render_template('event.html', user=current_user)
+
 
 if __name__ == '__main__':
     app.run()

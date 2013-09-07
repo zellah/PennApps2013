@@ -26,6 +26,11 @@
 {% include 'header.html' %}
     <div class="container">
     {% block content_body %}
+      <div class="starter-template">
+        <h1>{% block title %}Reimburst{% endblock title%}</h1>
+        <p class="lead">Track group purchases and get reimbursed - easy, math-free, and instant through Venmo.</p>
+      </div>
+    </div><!-- /.container -->
     {% endblock content_body%}
 
     <!-- Bootstrap core JavaScript
