@@ -85,7 +85,7 @@ class Event(db.Model):
     participants = db.relationship("User", secondary = events_users,
                                    backref = "events")
     created = db.Column(db.DateTime, default = datetime.datetime.now)
-    settled = db.Column(db.Boolean)
+    settled = db.Column(db.Boolean, default=False)
     end_date = db.Column(db.DateTime, default = lambda: datetime.datetime.now()
             + datetime.timedelta(days=2))
 
@@ -122,12 +122,12 @@ def display_transaction_data(transid):
     transaction_dict = get_transaction_dict(transid)
     return json.dumps(transaction_dict, default=dthandler)
 
-def get_transaction_data(transid):
+def get_transaction_dict(transid):
     transaction = Transaction.query.filter(Transaction.id == transid).first()
     if not transaction:
         return 'transaction not found', 404
     transaction_dict = asdict(transaction)
-    transaction_dict['creator'] = asdict(transaction.creator)
+    transaction_dict['creator'] = get_user_data(transaction.creator.id)
     transaction_dict['participants'] = [asdict(participant)
             for participant in transaction.participants]
     return transaction_dict
@@ -138,7 +138,7 @@ def display_event_data(eventid):
     if not event:
         return 'event not found', 404
     event_dict = asdict(event)
-    event_dict['transactions'] = [get_transaction_data(transaction.id)
+    event_dict['transactions'] = [get_transaction_dict(transaction.id)
             for transaction in event.transactions]
     event_dict['participants'] = [asdict(participant)
             for participant in event.participants]
