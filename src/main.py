@@ -1,16 +1,19 @@
 import datetime
 import os
+import json
 
-from flask import Flask, render_template
+from flask import Flask, render_template, request
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required
+from sqlalchemy.orm import class_mapper
 
+dthandler = lambda obj: obj.isoformat() if isinstance(obj, datetime.datetime) else None
 # Create app
 app = Flask(__name__)
 app.config['DEBUG'] = True
 app.config['SECRET_KEY'] = 'super-secret'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://%s/app.db' % os.path.dirname(__file__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///%s/app.db' % (os.path.abspath(os.path.dirname(__file__)),)
 app.config['SECURITY_REGISTERABLE'] = True
 app.config['SECURITY_CHANGEABLE'] = True
 app.config['SECURITY_SEND_REGISTER_EMAIL'] = False
@@ -32,14 +35,21 @@ class Role(db.Model, RoleMixin):
     name = db.Column(db.String(80), unique=True)
     description = db.Column(db.String(255))
 
+friends = db.Table('friends',
+        db.Column('f1_id', db.Integer(), db.ForeignKey('user.id')),
+        db.Column('f2_id', db.Integer(), db.ForeignKey('user.id')))
+
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True)
+    names = db.Column(db.String(255))
     password = db.Column(db.String(255))
     active = db.Column(db.Boolean())
-    confirmed_at = db.Column(db.DateTime())
+    created = db.Column(db.DateTime(), default = datetime.datetime.now)
     roles = db.relationship('Role', secondary=roles_users,
                             backref=db.backref('users', lazy='dynamic'))
+    friends = db.relationship('User', secondary=friends,
+                            primaryjoin=friends.c.f1_id==id, secondaryjoin=friends.c.f2_id==id)
 
 transactions_users = db.Table('transactions_users',
         db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
@@ -56,7 +66,7 @@ class Transaction(db.Model):
     participants = db.relationship("User", secondary = transactions_users,
                                    backref = "transactions")
     created = db.Column(db.DateTime, default = datetime.datetime.now)
-    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'), nullable=True)
     event = db.relationship("Event", backref = "transactions")
 
 events_users = db.Table('events_users',
@@ -79,8 +89,193 @@ security = Security(app, user_datastore)
 
 # Api stuff
 @app.route('/api/user/<int:userid>', methods = ['GET'])
+def display_user_data(userid):
+    return json.dumps(get_user_data(userid), default=dthandler)
+
 def get_user_data(userid):
-    pass
+    user = User.query.filter(User.id==userid).first()
+    if not user:
+        return 'user not found', 404
+    userdict = asdict(user)
+    del userdict['password']
+    userdict['friends'] = get_friends(userid)
+    return userdict
+
+@app.route('/api/user/<int:userid>/friends', methods = ['GET'])
+def display_friend_data(userid):
+    friends = [get_user_data(friend_id) for friend_id in get_friends(userid)]
+    return json.dumps(get_friends(friends), default=dthandler)
+
+def get_friends(userid):
+    return [row.f2_id for row in db.session.query(friends.c.f1_id == userid).all()]
+
+@app.route('/api/transaction/<int:transid>', methods = ['GET'])
+def display_transaction_data(transid):
+    transaction = Transaction.query.filter(Transaction.id == transid).first()
+    if not transaction:
+        return 'transaction not found', 404
+    transaction_dict = asdict(transaction)
+    return json.dumps(transaction_dict, default=dthandler)
+
+@app.route('/api/event/<int:eventid>', methods = ['GET'])
+def display_event_data(eventid):
+    event = Event.query.filter(Event.id == eventid).first()
+    if not event:
+        return 'event not found', 404
+    return json.dumps(asdict(event), default=dthandler)
+
+@app.route('/api/event/<int:eventid>/transactions', methods = ['GET'])
+def display_transactions(eventid):
+    event = Event.query.filter(Event.id == eventid).first()
+    if not event:
+        return 'event not found', 404
+    return json.dumps(map(asdict, event.transactions), default=dthandler)
+
+@app.route('/api/transaction', methods = ['POST'])
+@login_required
+def new_transaction():
+    modified_form = request.form.copy()
+    participant_ids = []
+    if 'participants' in modified_form:
+        participant_ids = modified_form['participants']
+        del modified_form['participants']
+    modified_form['creator_id'] = current_user.id
+    transaction = Transaction(**modified_form)
+    db.session.add(transaction)
+    db.session.commit()
+    for participant_id in participant_ids:
+        conn = db.session.connection()
+        conn.execute(transactions_users.insert(
+            transaction_id=transaction.id, user_id=participant_id))
+        conn.close()
+
+@app.route('/api/event', methods = ['POST'])
+@login_required
+def new_event():
+    modified_form = request.form.copy()
+    participant_ids = []
+    if 'participants' in modified_form:
+        participant_ids = modified_form['participants']
+        del modified_form['participants']
+    transaction_ids = []
+    if 'transactions' in modified_form:
+        transaction_ids = modified_form['transactions']
+        del modified_form['transactions']
+    modified_form['creator_id'] = current_user.id
+    event = Event(**modified_form)
+    db.session.add(event)
+    db.session.commit()
+    for participant_id in participant_ids:
+        conn = db.session.connection()
+        conn.execute(events_users.insert(
+            event_id=event.id, user_id=participant_id))
+        conn.close()
+    for transaction_id in transaction_ids:
+        transaction = Transaction.query.filter(Transaction.id == transaction_id).one()
+        transaction.event = event
+        db.session.add(transaction)
+    db.session.commit()
+
+@app.route('/api/user', methods = ['POST'])
+def new_user():
+    raise NotImplemented
+
+@app.route('/api/transaction/<int:transid>', methods= ['POST'])
+def edit_transaction(transid):
+    trans_to_edit = Transaction.query.filter(Transaction.id == transid).first()
+    if not trans_to_edit:
+        return 'no such transaction', 404
+    for k,v in request.form.items():
+        if k == 'creator' or k == 'creator_id':
+            trans_to_edit.creator_id = v
+        elif k == 'event' or k == 'event_id':
+            trans_to_edit.event_id = v
+        elif k == 'new_participants':
+            for participant_id in v:
+                trans_to_edit.participants.append(
+                    User.query.filter(User.id == participant_id).one())
+        elif k == 'participants':
+            del trans_to_edit.participants[:]
+            for participant_id in v:
+                trans_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
+        else:
+            setattr(trans_to_edit, k, v)
+    db.session.add(trans_to_edit)
+    db.session.commit()
+
+@app.route('/api/event/<int:eventid>', methods=['POST'])
+def edit_event(eventid):
+    event_to_edit = Event.query.filter(Event.id == eventid).first()
+    if not event_to_edit:
+        return 'no such event', 404
+    for k,v in request.form.items():
+        if k == 'creator' or k == 'creator_id':
+            event_to_edit.creator_id = v
+        elif k == 'new_participants':
+            for participant_id in v:
+                event_to_edit.participants.append(
+                    User.query.filter(User.id == participant_id).one())
+        elif k == 'all_participants':
+            del event_to_edit.participants[:]
+            for participant_id in v:
+                event_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
+        elif k == 'new_transactions':
+            for trans_id in v:
+                event_to_edit.transactions.append(
+                    Transaction.query.filter(Transaction.id == trans_id).one())
+        elif k == 'all_transactions':
+            del event_to_edit.transactions[:]
+            for trans_id in v:
+                event_to_edit.transactions.append(
+                    Transaction.query.filter(Transaction.id == trans_id).one())
+        elif k == 'transactions' or k == 'participants':
+            return 'needs to be "new_transactions" or "all_participants" or whatever', 422
+        else:
+            setattr(trans_to_edit, k, v)
+    db.session.add(trans_to_edit)
+    db.session.commit()
+
+@app.route('/api/user/<int:userid>', methods = ['POST'])
+def edit_user(userid):
+    user_to_edit = User.query.filter(User.id == userid).first()
+    if not user_to_edit:
+        return 'no such user', 404
+    for k,v in request.form.items():
+        if k == 'password' or k == 'roles':
+            return 'dumbass.', 403
+        elif k == 'friends' or k == 'transactions' or k == 'events':
+            return 'prefix that with new_ or all_ for append or replace', 422
+        elif k == 'new_friends':
+            for new_friend_id in v:
+                new_friend = User.query.filter(User.id == new_friend_id).one()
+                user_to_edit.friends.append(new_friend)
+        elif k == 'all_friends':
+            del user_to_edit.friends[:]
+            for new_friend_id in v:
+                new_friend = User.query.filter(User.id == new_friend_id).one()
+                user_to_edit.friends.append(new_friend)
+        elif k == 'new_transactions':
+            for trans_id in v:
+                user_to_edit.transactions.append(Transaction.query.filter(
+                    Transaction.id == trans_id).one())
+        elif k == 'all_transactions':
+            del user_to_edit.transactions[:]
+            for trans_id in v:
+                user_to_edit.transactions.append(Transaction.query.filter(
+                    Transaction.id == trans_id).one())
+        elif k == 'new_events':
+            for event_id in v:
+                new_event = Event.query.filter(Event.id == event_id).one()
+                user_to_edit.events.append(new_event)
+        elif k == 'all_events':
+            del user_to_edit.events[:]
+            for event_id in v:
+                new_event = Event.query.filter(Event.id == event_id).one()
+                user_to_edit.events.append(new_event)
+        else:
+            setattr(user_to_edit, k, v)
+    db.session.add(user_to_add)
+    db.session.commit()
 
 # Views
 @app.route('/')
