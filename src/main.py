@@ -113,7 +113,9 @@ def display_friend_data(userid):
     return json.dumps(get_friends(friends), default=dthandler)
 
 def get_friends(userid):
-    return [row.f2_id for row in db.session.query(friends.c.f1_id == userid).all()]
+    conn = db.session.connection()
+    results = conn.execute(friends.select(friends.c.f1_id == userid)).fetchall()
+    return [f2_id for f1_id, f2_id in results]
 
 @app.route('/api/transaction/<int:transid>', methods = ['GET'])
 def display_transaction_data(transid):
