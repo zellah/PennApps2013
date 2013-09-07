@@ -60,10 +60,10 @@ transactions_users = db.Table('transactions_users',
 
 class Transaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255))
-    description = db.Column(db.String(1024))
-    vendor = db.Column(db.String(255))
-    amount_cents = db.Column(db.Integer)
+    name = db.Column(db.String(255), nullable=True)
+    description = db.Column(db.String(1024), nullable=True)
+    vendor = db.Column(db.String(255), nullable=True)
+    amount_cents = db.Column(db.Integer, nullable=False)
     creator_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     creator = db.relationship("User", backref = "created_transactions")
     participants = db.relationship("User", secondary = transactions_users,
@@ -179,9 +179,9 @@ def new_event():
         participant_ids = modified_form.getlist('participants[]')
         del modified_form['participants[]']
     transaction_ids = []
-    if 'transactions' in modified_form:
-        transaction_ids = modified_form['transactions']
-        del modified_form['transactions']
+    if 'transactions[]' in modified_form:
+        transaction_ids = modified_form.getlist('transactions[]')
+        del modified_form['transactions[]']
     modified_form['creator_id'] = current_user.id
     event = Event(**modified_form)
     db.session.add(event)
