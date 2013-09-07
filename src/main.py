@@ -43,7 +43,7 @@ friends = db.Table('friends',
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(255), unique=True)
-    names = db.Column(db.String(255))
+    name = db.Column(db.String(255))
     password = db.Column(db.String(255))
     active = db.Column(db.Boolean())
     created = db.Column(db.DateTime(), default = datetime.datetime.now)
