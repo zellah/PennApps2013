@@ -50,6 +50,7 @@ class User(db.Model, UserMixin):
                             backref=db.backref('users', lazy='dynamic'))
     friends = db.relationship('User', secondary=friends,
                             primaryjoin=friends.c.f1_id==id, secondaryjoin=friends.c.f2_id==id)
+    venmo_key = db.Column(db.String(255))
 
 transactions_users = db.Table('transactions_users',
         db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
@@ -82,6 +83,9 @@ class Event(db.Model):
     participants = db.relationship("User", secondary = events_users,
                                    backref = "events")
     created = db.Column(db.DateTime, default = datetime.datetime.now)
+    settled = db.Column(db.Boolean)
+    end_date = db.Column(db.DateTime, default = lambda: datetime.datetime.now()
+            + datetime.timedelta(days=2))
 
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
@@ -111,18 +115,31 @@ def get_friends(userid):
 
 @app.route('/api/transaction/<int:transid>', methods = ['GET'])
 def display_transaction_data(transid):
+    transaction_dict = get_transaction_dict(transid)
+    return json.dumps(transaction_dict, default=dthandler)
+
+def get_transaction_data(transid):
     transaction = Transaction.query.filter(Transaction.id == transid).first()
     if not transaction:
         return 'transaction not found', 404
     transaction_dict = asdict(transaction)
-    return json.dumps(transaction_dict, default=dthandler)
+    transaction_dict['creator'] = asdict(transaction.creator)
+    transaction_dict['participants'] = [asdict(participant)
+            for participant in transaction.participants]
+    return transaction_dict
 
 @app.route('/api/event/<int:eventid>', methods = ['GET'])
 def display_event_data(eventid):
     event = Event.query.filter(Event.id == eventid).first()
     if not event:
         return 'event not found', 404
-    return json.dumps(asdict(event), default=dthandler)
+    event_dict = asdict(event)
+    event_dict['transactions'] = [get_transaction_data(transaction.id)
+            for transaction in event.transactions]
+    event_dict['participants'] = [asdict(participant)
+            for participant in event.participants]
+    event_dict['creator'] = asdict(event.creator)
+    return json.dumps(event_dict, default=dthandler)
 
 @app.route('/api/event/<int:eventid>/transactions', methods = ['GET'])
 def display_transactions(eventid):
@@ -194,10 +211,16 @@ def edit_transaction(transid):
             for participant_id in v:
                 trans_to_edit.participants.append(
                     User.query.filter(User.id == participant_id).one())
-        elif k == 'participants':
+        elif k == 'all_participants':
             del trans_to_edit.participants[:]
             for participant_id in v:
                 trans_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
+        elif k == 'del_participants':
+            conn = db.session.connection()
+            conn.execute(transactions_users.delete().where(
+                transactions_users.c.user_id.in_(v)).where(
+                transactions_users.c.transaction_id == trans_to_edit.id))
+            conn.close()
         else:
             setattr(trans_to_edit, k, v)
     db.session.add(trans_to_edit)
@@ -219,6 +242,12 @@ def edit_event(eventid):
             del event_to_edit.participants[:]
             for participant_id in v:
                 event_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
+        elif k == 'del_participants':
+            conn = db.session.connection()
+            conn.execute(events_users.delete().where(
+                events_users.c.user_id.in_(v)).where(
+                events_users.c.event_id == event_to_edit.id))
+            conn.close()
         elif k == 'new_transactions':
             for trans_id in v:
                 event_to_edit.transactions.append(
@@ -228,11 +257,16 @@ def edit_event(eventid):
             for trans_id in v:
                 event_to_edit.transactions.append(
                     Transaction.query.filter(Transaction.id == trans_id).one())
+        elif k == 'del_transactions':
+            for trans_id in v:
+                edit_trans = Transaction.query.filter(Transaction.id == trans_id).one()
+                edit_trans.event = None
+                db.session.add(edit_trans)
         elif k == 'transactions' or k == 'participants':
             return 'needs to be "new_transactions" or "all_participants" or whatever', 422
         else:
-            setattr(trans_to_edit, k, v)
-    db.session.add(trans_to_edit)
+            setattr(event_to_edit, k, v)
+    db.session.add(event_to_edit)
     db.session.commit()
 
 @app.route('/api/user/<int:userid>', methods = ['POST'])
@@ -254,6 +288,10 @@ def edit_user(userid):
             for new_friend_id in v:
                 new_friend = User.query.filter(User.id == new_friend_id).one()
                 user_to_edit.friends.append(new_friend)
+        elif k == 'del_friends':
+            for old_friend_id in v:
+                old_friend = User.query.filter(User.id == old_friend_id).one()
+                user_to_edit.friends.remove(old_friend)
         elif k == 'new_transactions':
             for trans_id in v:
                 user_to_edit.transactions.append(Transaction.query.filter(
@@ -263,6 +301,12 @@ def edit_user(userid):
             for trans_id in v:
                 user_to_edit.transactions.append(Transaction.query.filter(
                     Transaction.id == trans_id).one())
+        elif k == 'del_transactions':
+            conn = db.session.connection()
+            conn.execute(transactions_users.delete().where(
+                transactions_users.c.transaction_id.in_(v)).where(
+                transactions_users.c.user_id == user_to_edit.id))
+            conn.close()
         elif k == 'new_events':
             for event_id in v:
                 new_event = Event.query.filter(Event.id == event_id).one()
@@ -272,6 +316,12 @@ def edit_user(userid):
             for event_id in v:
                 new_event = Event.query.filter(Event.id == event_id).one()
                 user_to_edit.events.append(new_event)
+        elif k == 'del_events':
+            conn = db.session.connection()
+            conn.execute(events_users.delete().where(
+                events_users.c.event_id.in_(v)).where(
+                events_users.c.user_id == user_to_edit.id))
+            conn.close()
         else:
             setattr(user_to_edit, k, v)
     db.session.add(user_to_add)
