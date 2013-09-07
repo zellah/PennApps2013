@@ -281,7 +281,7 @@ def edit_user(userid):
 @app.route('/')
 @login_required
 def home():
-    return "Hello World!"
+    return render_template('home.html')
 
 if __name__ == '__main__':
     app.run()
