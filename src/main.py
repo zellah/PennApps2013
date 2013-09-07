@@ -35,6 +35,7 @@ class Role(db.Model, RoleMixin):
     id = db.Column(db.Integer(), primary_key=True)
     name = db.Column(db.String(80), unique=True)
     description = db.Column(db.String(255))
+admin_role = None
 
 friends = db.Table('friends',
         db.Column('f1_id', db.Integer(), db.ForeignKey('user.id')),
@@ -194,15 +195,14 @@ def new_event():
         db.session.add(transaction)
     db.session.commit()
 
-@app.route('/api/user', methods = ['POST'])
-def new_user():
-    raise NotImplemented
-
 @app.route('/api/transaction/<int:transid>', methods= ['POST'])
+@login_required
 def edit_transaction(transid):
     trans_to_edit = Transaction.query.filter(Transaction.id == transid).first()
     if not trans_to_edit:
         return 'no such transaction', 404
+    if current_user not in trans_to_edit:
+        return 'not authorized', 403
     for k,v in request.form.items():
         if k == 'creator' or k == 'creator_id':
             trans_to_edit.creator_id = v
@@ -228,10 +228,13 @@ def edit_transaction(transid):
     db.session.commit()
 
 @app.route('/api/event/<int:eventid>', methods=['POST'])
+@login_required
 def edit_event(eventid):
     event_to_edit = Event.query.filter(Event.id == eventid).first()
     if not event_to_edit:
         return 'no such event', 404
+    if current_user not in event_to_edit.participants:
+        return 'not authorized', 403
     for k,v in request.form.items():
         if k == 'creator' or k == 'creator_id':
             event_to_edit.creator_id = v
@@ -271,7 +274,10 @@ def edit_event(eventid):
     db.session.commit()
 
 @app.route('/api/user/<int:userid>', methods = ['POST'])
+@login_required
 def edit_user(userid):
+    if userid != current_user.id and admin_role not in current_user.roles:
+        return 'NOT AUTHORIZED', 403
     user_to_edit = User.query.filter(User.id == userid).first()
     if not user_to_edit:
         return 'no such user', 404
@@ -330,6 +336,7 @@ def edit_user(userid):
 
 # Views
 @app.route('/')
+@login_required
 def home():
     return render_template('home.html', user=current_user)
 
@@ -340,4 +347,9 @@ def event(id):
 
 
 if __name__ == '__main__':
+    admin_role = Role.query.filter(Role.name == 'admin').first()
+    if not admin_role:
+        admin_role = Role(name='admin', description='admin user')
+        db.session.add(admin_role)
+        db.session.commit()
     app.run()
