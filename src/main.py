@@ -156,10 +156,11 @@ def display_transactions(eventid):
 @login_required
 def new_transaction():
     modified_form = request.form.copy()
+    print modified_form
     participant_ids = []
-    if 'participants' in modified_form:
-        participant_ids = modified_form['participants']
-        del modified_form['participants']
+    if 'participants[]' in modified_form:
+        participant_ids = modified_form.getlist['participants[]']
+        del modified_form['participants[]']
     modified_form['creator_id'] = current_user.id
     transaction = Transaction(**modified_form)
     db.session.add(transaction)
