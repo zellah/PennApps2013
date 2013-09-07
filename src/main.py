@@ -1,4 +1,5 @@
 import datetime
+import os
 
 from flask import Flask, render_template
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -9,13 +10,17 @@ from flask.ext.security import Security, SQLAlchemyUserDatastore, \
 app = Flask(__name__)
 app.config['DEBUG'] = True
 app.config['SECRET_KEY'] = 'super-secret'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite://%s/app.db' % os.path.dirname(__file__)
 app.config['SECURITY_REGISTERABLE'] = True
 app.config['SECURITY_CHANGEABLE'] = True
 app.config['SECURITY_SEND_REGISTER_EMAIL'] = False
 
 # Create database connection object
 db = SQLAlchemy(app)
+
+def asdict(obj):
+    return dict((col.name, getattr(obj, col.name))
+                for col in class_mapper(obj.__class__).mapped_table.c)
 
 # Define models
 roles_users = db.Table('roles_users',
@@ -71,6 +76,11 @@ class Event(db.Model):
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore)
+
+# Api stuff
+@app.route('/api/user/<int:userid>', methods = ['GET'])
+def get_user_data(userid):
+    pass
 
 # Views
 @app.route('/')
