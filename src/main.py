@@ -161,14 +161,22 @@ def new_transaction():
         participant_ids = modified_form.getlist('participants[]')
         del modified_form['participants[]']
     modified_form['creator_id'] = current_user.id
-    transaction = Transaction(**modified_form)
+    transaction = Transaction(name=modified_form.get('name'),
+            description = modified_form.get('description'),
+            event_id = modified_form.get('event_id'),
+            creator_id = modified_form.get('creator_id'),
+            vendor = modified_form.get('vendor'),
+            amount_cents = modified_form.get('amount_cents')
+            )
+    print asdict(transaction)
     db.session.add(transaction)
     db.session.commit()
+    conn = db.session.connection()
     for participant_id in participant_ids:
-        conn = db.session.connection()
         conn.execute(transactions_users.insert(
             transaction_id=transaction.id, user_id=participant_id))
-        conn.close()
+    conn.close()
+    return json.dumps(True), 200
 
 @app.route('/api/event', methods = ['POST'])
 @login_required
@@ -196,6 +204,7 @@ def new_event():
         transaction.event = event
         db.session.add(transaction)
     db.session.commit()
+    return True
 
 @app.route('/api/transaction/<int:transid>', methods= ['POST'])
 @login_required
