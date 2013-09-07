@@ -176,7 +176,7 @@ def new_transaction():
         conn.execute(transactions_users.insert(
             transaction_id=transaction.id, user_id=participant_id))
     conn.close()
-    return json.dumps(True), 200
+    return display_transaction_data(transaction.id)
 
 @app.route('/api/event', methods = ['POST'])
 @login_required
@@ -191,20 +191,23 @@ def new_event():
         transaction_ids = modified_form.getlist('transactions[]')
         del modified_form['transactions[]']
     modified_form['creator_id'] = current_user.id
-    event = Event(**modified_form)
+    event = Event(name=modified_form.get('name'),
+            description = modified_form.get('description'),
+            creator_id = modified_form.get('creator_id')
+            )
     db.session.add(event)
     db.session.commit()
-    for participant_id in participant_ids:
-        conn = db.session.connection()
-        conn.execute(events_users.insert(
-            event_id=event.id, user_id=participant_id))
-        conn.close()
     for transaction_id in transaction_ids:
         transaction = Transaction.query.filter(Transaction.id == transaction_id).one()
         transaction.event = event
         db.session.add(transaction)
     db.session.commit()
-    return True
+    conn = db.session.connection()
+    for participant_id in participant_ids:
+        conn.execute(events_users.insert(
+            event_id=event.id, user_id=participant_id))
+    conn.close()
+    return display_event_data(event.id)
 
 @app.route('/api/transaction/<int:transid>', methods= ['POST'])
 @login_required
