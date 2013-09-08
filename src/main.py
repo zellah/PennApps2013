@@ -347,6 +347,73 @@ def edit_user(userid):
     db.session.commit()
     return display_user_data(user_to_edit.id)
 
+#Venmo
+@app.route('/api/venmo/accesstoken', methods = ['GET'])
+@login_required
+def getAccessToken():
+    code = request.args.get('code')
+    values = {'code':code, 'client_id':client_id, 'client_secret':client_secret}
+    data = urllib.urlencode(values)
+    request = urllib2.Request('https://api.venmo.com/oauth/access_token')
+    try:
+        res = urllib2.urlopen(request, data)
+    except:
+        return 'Could not retrieve access_token', 405
+    rJson = simplejson.load(res)
+    access_token = rJson['access_token']
+    user = User.query.filter(User.id == current_user.id).one()
+    user.venmo_key = access_token
+    db.session.add(user)
+    db.commit()
+    return redirect(url_for('account'))
+
+@app.route('/api/venmo/pay/', methods = ['POST'])
+def payUser(recipient_id, amount, user_id):
+    recipient_id = request.form.get(recipient_id)
+    amount = request.form.get(amount)
+    user_id = request.form.get(user_id)
+    user = User.query.filter(User.id == user_id).one()
+    access_token = user.venmo_key
+    data = urllib.urlencode({'access_token':"bZZCt4H3vbh5JgSXMBMh2mnUBT7hDb7a", 'user_id':user_id, "amount":amount})
+    request = urllib2.Request("https://sandbox-api.venmo.com/payments")
+    res = urllib2.urlopen(request, data)
+
+def settle():
+    ##find creator
+    event = Event.query.filter(Event.id == eventid).first()
+    creator = event.creator
+
+    ##find all users involved
+    participants = event.participants
+
+    ##add money for each transaction
+    partysize = participants.size
+    payTable = [[0.0 for x in xrange(partysize + 1)] for x in xrange(partysize + 1)]
+    translation_number = 1
+    for eventparticipant in eventparticipants:
+        payTable[0][translation_number] = eventparticipant
+        payTable[translation_number][0] = eventparticipant
+    transactions = Transaction.query.filter(Transaction.event_id = eventid)
+    for transaction in transactions:
+        amount = transaction.amount_cents
+        transparticipants = transaction.participants
+        transpartysize = transparticipants.size + 1
+        creator = transaction.creator
+        iou = amount/transpartysize
+        creatorIndex = 1
+        for index in range(partysize + 1):
+            if (payTable[0][index] == creator):
+                creatorIndex = index
+        for index in range(partysize + 1):
+            if (payTable[0][index] in participants):
+                payTable[creatorIndex][index] += iou
+            
+    ##calculate who owes money to whom
+    for xindex in range(partysize):
+        for yindex in range(xindex, partysize):
+            payTable[xindex][yindex] += payTable[yindex][xindex]
+
+
 # Views
 @app.route('/')
 @login_required
