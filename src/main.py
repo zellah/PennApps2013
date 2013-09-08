@@ -310,9 +310,10 @@ def add_user(eventid):
     event = Event.query.filter(Event.id == eventid).first()
     if not event:
         return json.dumps({'error' : True, 'message' : 'jesus christ what did you doooooooo'})
-    event.participants.append(user)
-    db.session.add(event)
-    db.session.commit()
+    if not user in event.participants:
+        event.participants.append(user)
+        db.session.add(event)
+        db.session.commit()
     event_dict = get_event_dict(eventid)
     event_dict['error'] = False
     return json.dumps(event_dict, default=dthandler)
