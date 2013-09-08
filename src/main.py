@@ -32,7 +32,7 @@ roles_users = db.Table('roles_users',
         db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
         db.Column('role_id', db.Integer(), db.ForeignKey('role.id')))
 
-class ExtendedRegisterForm(RegisterForm):
+class SpecialRegisterForm(RegisterForm):
     name = TextField('Full Name', [Required()])
 
 class Role(db.Model, RoleMixin):
@@ -95,7 +95,7 @@ class Event(db.Model):
 
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
-security = Security(app, user_datastore, register_form = ExtendedRegisterForm)
+security = Security(app, user_datastore, register_form = SpecialRegisterForm)
 
 # Api stuff
 @app.route('/api/user/<int:userid>', methods = ['GET'])
