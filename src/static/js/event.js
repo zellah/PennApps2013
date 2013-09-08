@@ -1,23 +1,25 @@
+var eventData;
+
 renderEventPage = function() {
     bindEventHandlers();
-    
     $.getJSON("/api/event/"+eventID, function(data){
         console.log(data.transactions);
-        renderTransactions(data); 
+        eventData = data;
+        renderTransactions(); 
     });
 }
 
-renderTransactions = function(dataIn) {
+renderTransactions = function() {
     var $trans = $('#all_trans'),
         htmlString = '',
-        data = dataIn.transactions;
+        data = eventData.transactions;
     if (data.length <1) {
         htmlString = "This event has no transactions yet.";
     } else {
         for (var i=0; i<data.length; i++) {
             var amtStr = data[i].amount_cents.toString();
             data[i].amount = amtStr.slice(0,-2)+"."+amtStr.substring(amtStr.length-2, amtStr.length);
-            htmlString += "<div id=trans_"+i+" >"+transTemplate(data[i])+"</div>";
+            htmlString += "<div id='trans_id_"+data[i].id+"'>"+transTemplate(data[i])+"</div>";
         }
     }
     $trans.html(htmlString);
@@ -37,24 +39,23 @@ bindTransHandlers = function() {
         })
         .on("click", '#edit_trans_button_submit', function(){
             //TODO: later check if form was changed, for now don't bother
-            var el = $(this),
+            var el = $(this).parent(),
                 $form =el.parent().find('form#edit_trans_form'),
-                data = $form.getFormData();
+                formData = $form.getFormData();
             //toggle relevant display pieces
-            el.parent().find('div#trans_view').show();
-            el.parent().find('div#trans_edit').hide();
-            el.parent().find('#edit_trans_button').show();
-            el.parent().find('#edit_trans_button_submit').hide();
+            el.find('div#trans_view').show();
+            el.find('div#trans_edit').hide();
+            el.find('#edit_trans_button').show();
+            el.find('#edit_trans_button_submit').hide();
             //convert amount into cents and submit form over ajax
-            var loc = data.amount.indexOf(".");
+            var loc = formData.amount.indexOf(".");
             if (loc != -1) {
-                var val = data.amount.slice(0, loc)+data.amount.slice(loc+1, data.amount.length);
-                data.amount_cents = parseInt(val);
+                var val = formData.amount.slice(0, loc)+formData.amount.slice(loc+1, formData.amount.length);
+                formData.amount_cents = parseInt(val);
             } else {
-                data.amount_cents = parseInt(val)*100
+                formData.amount_cents = parseInt(formData.amount)*100
             }
-            var id = 0; //TODO: put in form as hidden field
-            submitTransEdit(data, id);
+            editTrans(formData);
         });
 }
 
@@ -65,59 +66,68 @@ bindEventHandlers = function() {
     });
     $('#submit_add_trans_button').click(function(){
         var $form =$('form#add_trans_form'),
-            data = $form.getFormData();
-        var loc = data.amount.indexOf(".");
+            formData = $form.getFormData();
+        var loc = formData.amount.indexOf(".");
         if (loc != -1) {
-            var val = data.amount.slice(0, loc)+data.amount.slice(loc+1, data.amount.length);
-            data.amount_cents = parseInt(val);
+            var val = formData.amount.slice(0, loc)+formData.amount.slice(loc+1, formData.amount.length);
+            formData.amount_cents = parseInt(val);
         } else {
-            data.amount_cents = parseInt(data.amount)*100
+            formData.amount_cents = parseInt(formData.amount)*100
         }
         $form.hide('fast');
         $form.find("input[type=text], textarea").val("");
-        submitTrans(data);
+        submitTrans(formData);
     });
     //TODO: js input verification onKeyUp in these inputs
     
     
 }
 
-submitTrans = function(data) {
-
-    //TODO: TypeError: 'participants[]' is an invalid keyword argument for Transaction
-
+submitTrans = function(formData) {
     //ajax call to /api/transaction
-    data.event_id = eventID;
-    delete data.amount;
-    console.log(data);
-    console.log(data.participants);
-    $.post("/api/transaction", data, function(ret) {
-        console.log(ret)
-        submitTransCallback(ret);
+    formData.event_id = eventID;
+    delete formData.amount;
+    $.post("/api/transaction", formData, function(newTransData) {
+        submitTransCallback(newTransData);
     });
 }
 
-submitTransEdit = function(data, id) {
+editTrans = function(data) {
     //ajax call to /api/transaction/<id>
     data.event_id = eventID;
-    console.log(data);
-    $.post("/api/transaction"+id, data, function(data) {
+    $.post("/api/transaction/"+data.id, data, function(data) {
         editTransCallback(data);
     });
     
 }
 
-submitTransCallback = function(returnData){
+submitTransCallback = function(newTransData){
+    //TODO: success message:
     //there's a message that lights up and then fades,
     //without resizing anything because mobile
-    console.log("Add Transcation Success");
-    //TODO: either re-render or manually add the new transaction
+
+    newTransData = $.parseJSON(newTransData);
+    console.log(newTransData);
+    eventData.transactions.push(newTransData);
+    var amtStr = newTransData.amount_cents.toString();
+    newTransData.amount = amtStr.slice(0,-2)+"."+amtStr.substring(amtStr.length-2, amtStr.length);
+    var htmlString = "<div id='trans_id_"+newTransData.id+"'>"+transTemplate(newTransData)+"</div>";
+    $('#all_trans').append(htmlString);
 }
 
 editTransCallback = function(returnData){
+    //TODO: success message:
     //there's a message that lights up and then fades,
     //without resizing anything because mobile
-    console.log("Edit Transcation Success");
+
+    returnData = $.parseJSON(returnData);
+    console.log(returnData); 
+    //update view based on this
+    var $el = $('div#trans_id_'+returnData.id);
+    //TODO: also update description once it's editable
+    var amtStr = returnData.amount_cents.toString();
+    $el.find('span#trans_amount').text(amtStr.slice(0,-2)+"."+amtStr.substring(amtStr.length-2, amtStr.length));
+    $el.find('span#trans_vendor').text(returnData.vendor);
 }
 
 $.fn.getFormData = function() {
@@ -137,10 +147,10 @@ $.fn.getFormData = function() {
 }
 
 transTemplate = function(data){
-    return '<span id="trans_desc"><h3>'+data.description+'   $'+data.amount
-        +'   <span class="smallH3" style="font-size:10px">'+data.created+'</span></h3></span>'
+    return '<span id="trans_desc"><h3>'+data.description+'   $<span id="trans_amount">'+data.amount
+        +'</span>   <span class="smallH3" style="font-size:10px">'+data.created+'</span></h3></span>'
         //collapsed info
-        +'<div id="collapse_trans" style="display: none" data-node-value='+data.id+'>'
+        +'<div id="collapse_trans" style="display: none">'
         +'<div id="trans_view">'
             +'On <span id="trans_date">'+data.created+'</span>, '
             +'<span id="trans_creator">'+data.creator.name+'</span> spent '
@@ -151,7 +161,7 @@ transTemplate = function(data){
         //edit form
         +'<div id="trans_edit" data-node-value='+data.id+' style="display: none">'
         +'<form id="edit_trans_form">'
-            +'On <input type="text" name="date" value="'+data.created+'">, '
+            +'<input type="hidden" name="id" value="'+data.id+'">'
             +'<span id="trans_creator">'+data.creator.name+'</span> spent '
             +'$<input type="text" name="amount" value="'+data.amount+'"> at '
             +'<input type="text" name="vendor" value="'+data.vendor+'">'

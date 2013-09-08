@@ -5,7 +5,7 @@
 var eventID = '{{ eventID }}';
 </script>
 <div class=metanav>
-  <h1> Event title </h1>
+  <h1> {{ event.name }} </h1>
   <span id="add_trans"><button type="button" id="add_trans_button">Add Transaction</button>
     <form id="add_trans_form" style="display: none">
       I paid $<input type="text" name="amount"><br/>
@@ -23,7 +23,7 @@ var eventID = '{{ eventID }}';
     <span id="i_owe">I owe: </span>
     <span id="i_paid">I paid: </span>
   </div>
-  <div id="all_trans"></div><!--Added with js-->
+  <div id="all_trans"></div>
   <div id="settle_now">Settle Now</div>
   <div id="bottom_bar">Add people  Edit Settings</div>
 </div>
@@ -31,5 +31,4 @@ var eventID = '{{ eventID }}';
 
 {% block load_js %}
 <script src="/static/js/event.js"></script>
-<script type=text/javascript src="{{ url_for('static', filename='jquery.js') }}"></script>
 {% endblock load_js%}

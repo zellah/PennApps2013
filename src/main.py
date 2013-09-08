@@ -354,7 +354,10 @@ def home():
 @app.route('/event/<id>')
 @login_required
 def event(id):
-    return render_template('event.html', user=current_user, eventID=id)
+    event_obj = Event.query.filter(Event.id == id).first()
+    if not event_obj:
+        return 'not found', 404
+    return render_template('event.html', user=current_user, eventID=id, event=event_obj)
 
 
 if __name__ == '__main__':
