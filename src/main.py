@@ -1,6 +1,7 @@
 import datetime
 import os
 import json
+import numpy
 from prettydate import pretty_date
 from flask import Flask, render_template, request
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -9,6 +10,8 @@ from flask.ext.security import Security, SQLAlchemyUserDatastore, \
 from sqlalchemy.orm import class_mapper
 from flask_security.core import current_user
 from flask_security.forms import RegisterForm, TextField, Required
+
+venmo_url = 'https://api.venmo.com/oauth/authorize?client_id=1351&scope=access_profile&response_type=code'
 
 dthandler = lambda obj: pretty_date(obj) if isinstance(obj, datetime.datetime) else None
 # Create app
@@ -401,8 +404,8 @@ def settle():
     participants = event.participants
 
     ##add money for each transaction
-    partysize = participants.size
-    payTable = [[0.0 for x in xrange(partysize + 1)] for x in xrange(partysize + 1)]
+    partysize = participants.size + 1
+	payTable = zeros( (partysize, partysize), dtype=int16)
     translation_number = 1
     for eventparticipant in eventparticipants:
         payTable[0][translation_number] = eventparticipant
@@ -411,21 +414,26 @@ def settle():
     for transaction in transactions:
         amount = transaction.amount_cents
         transparticipants = transaction.participants
-        transpartysize = transparticipants.size + 1
+        transpartysize = transparticipants.size
         creator = transaction.creator
         iou = amount/transpartysize
         creatorIndex = 1
-        for index in range(partysize + 1):
+        for index in range(partysize):
             if (payTable[0][index] == creator):
                 creatorIndex = index
-        for index in range(partysize + 1):
-            if (payTable[0][index] in participants):
+        for index in range(partysize):
+            if (payTable[0][index] in transparticipants):
                 payTable[creatorIndex][index] += iou
 
     ##calculate who owes money to whom
     for xindex in range(partysize):
         for yindex in range(xindex, partysize):
-            payTable[xindex][yindex] += payTable[yindex][xindex]
+			if payTable[xindex][yindex] > payTable[yindex][xindex]:
+				payTable[xindex][yindex] -= payTable[yindex][xindex]
+				payTable[yindex][xindex] = 0
+			else
+				payTable[yindex][xindex] -= payTable[xindex][yindex]
+				payTable[xindex][yindex] = 0
 	return payTable
 
 # Views
