@@ -114,6 +114,14 @@ def display_friend_data(userid):
     friends = [get_user_data(friend_id) for friend_id in get_friends(userid)]
     return json.dumps(get_friends(friends), default=dthandler)
 
+@app.route('/api/user/<int:userid>/events', methods = ['GET'])
+def get_events_from_userid(userid):
+    user = User.query.filter(User.id == userid).first()
+    if not user:
+        return 'user not found', 404
+    return json.dumps([get_event_dict(event.id)
+        for event in user.events], default=dthandler)
+
 def get_friends(userid):
     conn = db.session.connection()
     results = conn.execute(friends.select(friends.c.f1_id == userid)).fetchall()
@@ -136,6 +144,10 @@ def get_transaction_dict(transid):
 
 @app.route('/api/event/<int:eventid>', methods = ['GET'])
 def display_event_data(eventid):
+    event_dict = get_event_dict(eventid)
+    return json.dumps(event_dict, default=dthandler)
+
+def get_event_dict(eventid):
     event = Event.query.filter(Event.id == eventid).first()
     if not event:
         return 'event not found', 404
@@ -145,7 +157,7 @@ def display_event_data(eventid):
     event_dict['participants'] = [asdict(participant)
             for participant in event.participants]
     event_dict['creator'] = asdict(event.creator)
-    return json.dumps(event_dict, default=dthandler)
+    return event_dict
 
 @app.route('/api/transaction', methods = ['POST'])
 @login_required
