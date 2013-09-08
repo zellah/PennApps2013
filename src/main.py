@@ -213,7 +213,7 @@ def edit_transaction(transid):
     trans_to_edit = Transaction.query.filter(Transaction.id == transid).first()
     if not trans_to_edit:
         return 'no such transaction', 404
-    if current_user not in trans_to_edit:
+    if current_user not in trans_to_edit.participants and current_user != trans_to_edit.creator:
         return 'not authorized', 403
     for k,v in request.form.iterlists():
         if len(v) == 1 and not k.endswith('participants'):
