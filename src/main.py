@@ -174,7 +174,7 @@ def new_transaction():
     modified_form = request.form.copy()
     participant_ids = [current_user.id]
     if 'participants[]' in modified_form:
-        participant_ids = modified_form.getlist('participants[]')
+        participant_ids += modified_form.getlist('participants[]')
         del modified_form['participants[]']
     modified_form['creator_id'] = current_user.id
     transaction = Transaction(name=modified_form.get('name'),
@@ -199,7 +199,7 @@ def new_event():
     modified_form = request.form.copy()
     participant_ids = [current_user.id]
     if 'participants[]' in modified_form:
-        participant_ids = modified_form.getlist('participants[]')
+        participant_ids += modified_form.getlist('participants[]')
         del modified_form['participants[]']
     transaction_ids = []
     if 'transactions[]' in modified_form:
