@@ -345,7 +345,7 @@ def home():
 @app.route('/event/<id>')
 @login_required
 def event(id):
-    return render_template('event.html', user=current_user)
+    return render_template('event.html', user=current_user, eventID=id)
 
 
 if __name__ == '__main__':

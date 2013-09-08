@@ -1,17 +1,20 @@
 {% extends "base.html" %}
 
 {% block content_body %}
+<script>
+var eventID = '{{ eventID }}';
+</script>
 <div class=metanav>
   <h1> Event title </h1>
   <span id="add_trans"><button type="button" id="add_trans_button">Add Transaction</button>
     <form id="add_trans_form" style="display: none">
-      I paid <input type="text" name="amount"><br/>
+      I paid $<input type="text" name="amount"><br/>
       to <input type="text" name="vendor"><br/>
       for <input type="text" name="description"><br/>
       and 
-        <input type="checkbox" name="people" value="me" checked>Me
-        <input type="checkbox" name="people" value="you" checked>You
-        <input type="checkbox" name="people" value="spiderman" checked>Spiderman
+        <input type="checkbox" name="participants" value="me" checked>Me
+        <input type="checkbox" name="participants" value="you" checked>You
+        <input type="checkbox" name="participants" value="spiderman" checked>Spiderman
       benefitted.<br/>
       <button type="button" id="submit_add_trans_button">Submit</button>
     </form>
