@@ -217,7 +217,9 @@ def edit_transaction(transid):
         return 'no such transaction', 404
     if current_user not in trans_to_edit:
         return 'not authorized', 403
-    for k,v in request.form.items():
+    for k,v in request.form.iterlists():
+        if len(v) == 1 and not k.endswith('participants'):
+            v = v[0]
         if k == 'creator' or k == 'creator_id':
             trans_to_edit.creator_id = v
         elif k == 'event' or k == 'event_id':
@@ -249,7 +251,9 @@ def edit_event(eventid):
         return 'no such event', 404
     if current_user not in event_to_edit.participants:
         return 'not authorized', 403
-    for k,v in request.form.items():
+    for k,v in request.form.iterlists():
+        if len(v) == 1 and not k.endswith('participants') and not k.endswith('transactions'):
+            v = v[0]
         if k == 'creator' or k == 'creator_id':
             event_to_edit.creator_id = v
         elif k == 'new_participants':
@@ -296,6 +300,9 @@ def edit_user(userid):
     if not user_to_edit:
         return 'no such user', 404
     for k,v in request.form.items():
+        if (len(v) == 1 and not k.endswith('friends')
+                and not k.endswith('events') and not k.endswith('transactions')):
+            v = v[0]
         if k == 'password' or k == 'roles':
             return 'dumbass.', 403
         elif k == 'friends' or k == 'transactions' or k == 'events':
