@@ -393,7 +393,7 @@ def getAccessToken():
     db.commit()
     return redirect(url_for('account'))
 
-@app.route('/api/venmo/pay/', methods = ['POST'])
+@app.route('/api/venmo/pay', methods = ['POST'])
 def payUser(recipient_id, amount, user_id):
     recipient_id = request.form.get(recipient_id)
     amount = request.form.get(amount)
@@ -416,7 +416,7 @@ def settle():
     partysize = participants.size + 1
     payTable = zeros( (partysize, partysize), dtype=int16)
     translation_number = 1
-    for eventparticipant in eventparticipants:
+    for eventparticipant in participants:
         payTable[0][translation_number] = eventparticipant
         payTable[translation_number][0] = eventparticipant
     transactions = Transaction.query.filter(Transaction.event_id == eventid).all()
@@ -447,7 +447,6 @@ def settle():
 
 # Views
 @app.route('/')
-@login_required
 def home():
     return render_template('home.html', user=current_user)
 
