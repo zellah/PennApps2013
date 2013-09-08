@@ -2,6 +2,8 @@ import datetime
 import os
 import json
 
+from prettydate import pretty_date
+
 from flask import Flask, render_template, request
 from flask.ext.sqlalchemy import SQLAlchemy
 from flask.ext.security import Security, SQLAlchemyUserDatastore, \
@@ -9,7 +11,7 @@ from flask.ext.security import Security, SQLAlchemyUserDatastore, \
 from sqlalchemy.orm import class_mapper
 from flask_security.core import current_user
 
-dthandler = lambda obj: obj.isoformat() if isinstance(obj, datetime.datetime) else None
+dthandler = lambda obj: pretty_date(obj) if isinstance(obj, datetime.datetime) else None
 # Create app
 app = Flask(__name__)
 app.config['DEBUG'] = True
