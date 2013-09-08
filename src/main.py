@@ -145,13 +145,6 @@ def display_event_data(eventid):
     event_dict['creator'] = asdict(event.creator)
     return json.dumps(event_dict, default=dthandler)
 
-@app.route('/api/event/<int:eventid>/transactions', methods = ['GET'])
-def display_transactions(eventid):
-    event = Event.query.filter(Event.id == eventid).first()
-    if not event:
-        return 'event not found', 404
-    return json.dumps(map(asdict, event.transactions), default=dthandler)
-
 @app.route('/api/transaction', methods = ['POST'])
 @login_required
 def new_transaction():
@@ -239,6 +232,7 @@ def edit_transaction(transid):
             setattr(trans_to_edit, k, v)
     db.session.add(trans_to_edit)
     db.session.commit()
+    return display_transaction_data(trans_to_edit.id)
 
 @app.route('/api/event/<int:eventid>', methods=['POST'])
 @login_required
@@ -286,6 +280,7 @@ def edit_event(eventid):
             setattr(event_to_edit, k, v)
     db.session.add(event_to_edit)
     db.session.commit()
+    return display_event_data(event_to_edit.id)
 
 @app.route('/api/user/<int:userid>', methods = ['POST'])
 @login_required
@@ -346,8 +341,9 @@ def edit_user(userid):
                 events_users.c.user_id == user_to_edit.id))
         else:
             setattr(user_to_edit, k, v)
-    db.session.add(user_to_add)
+    db.session.add(user_to_edit)
     db.session.commit()
+    return display_user_data(user_to_edit.id)
 
 # Views
 @app.route('/')
