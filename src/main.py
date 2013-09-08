@@ -186,7 +186,7 @@ def new_transaction():
             )
     users = User.query.filter(User.id.in_(participant_ids)).all()
     for user in users:
-        transaction.participants.append(user.id)
+        transaction.participants.append(user)
     db.session.add(transaction)
     db.session.commit()
     return display_transaction_data(transaction.id)
@@ -216,7 +216,7 @@ def new_event():
         db.session.add(transaction)
     users = User.query.filter(User.id.in_(participant_ids)).all()
     for user in users:
-        event.participants.append(user.id)
+        event.participants.append(user)
     db.session.add(event)
     db.session.commit()
     return display_event_data(event.id)
