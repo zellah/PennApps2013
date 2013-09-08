@@ -98,6 +98,7 @@ class Event(db.Model):
 
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
+security = Security(app, user_datastore)
 security = Security(app, user_datastore, register_form = SpecialRegisterForm)
 
 @security.register_context_processor
@@ -446,6 +447,11 @@ def settle():
 def home():
     return render_template('home.html', user=current_user)
 
+@app.route('/account')
+@login_required
+def account():
+    return render_template('account.html', user=current_user)
+
 @app.route('/event/<id>')
 @login_required
 def event(id):
@@ -453,7 +459,6 @@ def event(id):
     if not event_obj:
         return 'not found', 404
     return render_template('event.html', user=current_user, eventID=id, event=event_obj)
-
 
 if __name__ == '__main__':
     admin_role = Role.query.filter(Role.name == 'admin').first()
