@@ -306,12 +306,14 @@ def add_user(eventid):
     user_email = request.form.get('email')
     user = User.query.filter(User.email == user_email).first()
     if not user:
-        return 'no such user'
+        return json.dumps({'error' : True})
     event = Event.query.filter(Event.id == eventid)
     event.participants.append(user)
     db.session.add(event)
     db.session.commit()
-    return display_event_data(eventid)
+    event_dict = get_event_dict(eventid)
+    event_dict['error'] = False
+    return json.dumps(event_dict, default=dthandler)
 
 @app.route('/api/user/<int:userid>', methods = ['POST'])
 @login_required
