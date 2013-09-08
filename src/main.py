@@ -100,7 +100,7 @@ class Event(db.Model):
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
 security = Security(app, user_datastore, register_form = SpecialRegisterForm)
 
-@security.register_context_processor
+@security.context_processor
 def security_register_processor():
     return dict(user=current_user)
 
