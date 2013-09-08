@@ -2,3 +2,4 @@ SQLAlchemy==0.8.2
 flask==0.10
 flask-sqlalchemy==1.0
 flask-security==1.6.9
+numpy==1.7.1
