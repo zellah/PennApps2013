@@ -98,7 +98,6 @@ class Event(db.Model):
 
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
-security = Security(app, user_datastore)
 security = Security(app, user_datastore, register_form = SpecialRegisterForm)
 
 @security.register_context_processor
