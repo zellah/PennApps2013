@@ -175,7 +175,6 @@ def new_transaction():
     for participant_id in participant_ids:
         conn.execute(transactions_users.insert(
             transaction_id=transaction.id, user_id=participant_id))
-    conn.close()
     return display_transaction_data(transaction.id)
 
 @app.route('/api/event', methods = ['POST'])
@@ -206,7 +205,6 @@ def new_event():
     for participant_id in participant_ids:
         conn.execute(events_users.insert(
             event_id=event.id, user_id=participant_id))
-    conn.close()
     return display_event_data(event.id)
 
 @app.route('/api/transaction/<int:transid>', methods= ['POST'])
@@ -237,7 +235,6 @@ def edit_transaction(transid):
             conn.execute(transactions_users.delete().where(
                 transactions_users.c.user_id.in_(v)).where(
                 transactions_users.c.transaction_id == trans_to_edit.id))
-            conn.close()
         else:
             setattr(trans_to_edit, k, v)
     db.session.add(trans_to_edit)
@@ -269,7 +266,6 @@ def edit_event(eventid):
             conn.execute(events_users.delete().where(
                 events_users.c.user_id.in_(v)).where(
                 events_users.c.event_id == event_to_edit.id))
-            conn.close()
         elif k == 'new_transactions':
             for trans_id in v:
                 event_to_edit.transactions.append(
@@ -334,7 +330,6 @@ def edit_user(userid):
             conn.execute(transactions_users.delete().where(
                 transactions_users.c.transaction_id.in_(v)).where(
                 transactions_users.c.user_id == user_to_edit.id))
-            conn.close()
         elif k == 'new_events':
             for event_id in v:
                 new_event = Event.query.filter(Event.id == event_id).one()
@@ -349,7 +344,6 @@ def edit_user(userid):
             conn.execute(events_users.delete().where(
                 events_users.c.event_id.in_(v)).where(
                 events_users.c.user_id == user_to_edit.id))
-            conn.close()
         else:
             setattr(user_to_edit, k, v)
     db.session.add(user_to_add)
