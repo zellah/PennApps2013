@@ -363,6 +363,11 @@ def edit_user(userid):
 def home():
     return render_template('home.html', user=current_user)
 
+@app.route('/account')
+@login_required
+def account():
+    return render_template('account.html', user=current_user)
+
 @app.route('/event/<id>')
 @login_required
 def event(id):
