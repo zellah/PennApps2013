@@ -184,13 +184,11 @@ def new_transaction():
             vendor = modified_form.get('vendor'),
             amount_cents = modified_form.get('amount_cents')
             )
-    print asdict(transaction)
+    users = User.query.filter(User.id.in_(participant_ids)).all()
+    for user in users:
+        transaction.participants.append(user.id)
     db.session.add(transaction)
     db.session.commit()
-    conn = db.session.connection()
-    for participant_id in participant_ids:
-        conn.execute(transactions_users.insert(
-            transaction_id=transaction.id, user_id=participant_id))
     return display_transaction_data(transaction.id)
 
 @app.route('/api/event', methods = ['POST'])
@@ -216,11 +214,11 @@ def new_event():
         transaction = Transaction.query.filter(Transaction.id == transaction_id).one()
         transaction.event = event
         db.session.add(transaction)
+    users = User.query.filter(User.id.in_(participant_ids)).all()
+    for user in users:
+        event.participants.append(user.id)
+    db.session.add(event)
     db.session.commit()
-    conn = db.session.connection()
-    for participant_id in participant_ids:
-        conn.execute(events_users.insert(
-            event_id=event.id, user_id=participant_id))
     return display_event_data(event.id)
 
 @app.route('/api/transaction/<int:transid>', methods= ['POST'])
