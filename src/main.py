@@ -8,6 +8,7 @@ from flask.ext.security import Security, SQLAlchemyUserDatastore, \
     UserMixin, RoleMixin, login_required
 from sqlalchemy.orm import class_mapper
 from flask_security.core import current_user
+from flask_security.forms import RegisterForm, TextField, Required
 
 dthandler = lambda obj: pretty_date(obj) if isinstance(obj, datetime.datetime) else None
 # Create app
@@ -30,6 +31,9 @@ def asdict(obj):
 roles_users = db.Table('roles_users',
         db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
         db.Column('role_id', db.Integer(), db.ForeignKey('role.id')))
+
+class ExtendedRegisterForm(RegisterForm):
+    name = TextField('Full Name', [Required()])
 
 class Role(db.Model, RoleMixin):
     id = db.Column(db.Integer(), primary_key=True)
@@ -91,7 +95,7 @@ class Event(db.Model):
 
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
-security = Security(app, user_datastore)
+security = Security(app, user_datastore, register_form = ExtendedRegisterForm)
 
 # Api stuff
 @app.route('/api/user/<int:userid>', methods = ['GET'])
@@ -161,7 +165,7 @@ def get_event_dict(eventid):
 @login_required
 def new_transaction():
     modified_form = request.form.copy()
-    participant_ids = []
+    participant_ids = [current_user.id]
     if 'participants[]' in modified_form:
         participant_ids = modified_form.getlist('participants[]')
         del modified_form['participants[]']
@@ -186,7 +190,7 @@ def new_transaction():
 @login_required
 def new_event():
     modified_form = request.form.copy()
-    participant_ids = []
+    participant_ids = [current_user.id]
     if 'participants[]' in modified_form:
         participant_ids = modified_form.getlist('participants[]')
         del modified_form['participants[]']
@@ -403,7 +407,7 @@ def settle():
     for eventparticipant in eventparticipants:
         payTable[0][translation_number] = eventparticipant
         payTable[translation_number][0] = eventparticipant
-    transactions = Transaction.query.filter(Transaction.event_id = eventid).all()
+    transactions = Transaction.query.filter(Transaction.event_id == eventid).all()
     for transaction in transactions:
         amount = transaction.amount_cents
         transparticipants = transaction.participants
@@ -417,13 +421,13 @@ def settle():
         for index in range(partysize + 1):
             if (payTable[0][index] in participants):
                 payTable[creatorIndex][index] += iou
-            
+
     ##calculate who owes money to whom
     for xindex in range(partysize):
         for yindex in range(xindex, partysize):
             payTable[xindex][yindex] += payTable[yindex][xindex]
 	return payTable
-	
+
 # Views
 @app.route('/')
 @login_required
