@@ -300,6 +300,18 @@ def edit_event(eventid):
     db.session.commit()
     return display_event_data(event_to_edit.id)
 
+@app.route('/api/event/<int:eventid>/adduser', methods = ['POST'])
+@login_required
+def add_user(eventid):
+    user_email = request.form.get('email')
+    user = User.query.filter(User.email == user_email).first()
+    if not user:
+        return 'no such user', 404
+    event = Event.query.filter(Event.id == eventid)
+    event.participants.append(user)
+    db.session.add(event)
+    db.session.commit()
+
 @app.route('/api/user/<int:userid>', methods = ['POST'])
 @login_required
 def edit_user(userid):
