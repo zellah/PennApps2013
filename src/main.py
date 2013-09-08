@@ -11,7 +11,7 @@ from sqlalchemy.orm import class_mapper
 from flask_security.core import current_user
 from flask_security.forms import RegisterForm, TextField, Required
 
-venmo_url = 'https://api.venmo.com/oauth/authorize?client_id=1351&scope=access_profile&response_type=code'
+venmo_url = 'https://api.venmo.com/oauth/authorize?client_id=1351&scope=access_profile,make_payments&response_type=code'
 
 dthandler = lambda obj: pretty_date(obj) if isinstance(obj, datetime.datetime) else None
 # Create app
@@ -95,6 +95,17 @@ class Event(db.Model):
     settled = db.Column(db.Boolean, default=False)
     end_date = db.Column(db.DateTime, default = lambda: datetime.datetime.now()
             + datetime.timedelta(days=2))
+
+payments_users = db.Table('payments_users',
+        db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
+        db.Column('payment_id', db.Integer(), db.ForeignKey('payment.id')))
+
+class Payment(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    recipient_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    event_id = db.Column(db.Integer, db.ForeignKey('event.id'))
+    amount_cents = db.Column(db.Integer)
 
 # Setup Flask-Security
 user_datastore = SQLAlchemyUserDatastore(db, User, Role)
@@ -410,7 +421,10 @@ def payUser(recipient_id, amount, user_id):
     request = urllib2.Request("https://sandbox-api.venmo.com/payments")
     res = urllib2.urlopen(request, data)
 
-def settle():
+
+@app.route('/api/venmo/settle/', methods = ['POST'])
+def settle(eventid):
+    eventid = request.form.get(eventid)
     ##find creator
     event = Event.query.filter(Event.id == eventid).first()
     creator = event.creator
@@ -440,16 +454,35 @@ def settle():
             if (payTable[0][index] in transparticipants):
                 payTable[creatorIndex][index] += iou
 
-    ##calculate who owes money to whom
+    ##calculate who owes money to whom/insert into payments table
     for xindex in range(partysize):
         for yindex in range(xindex, partysize):
             if payTable[xindex][yindex] > payTable[yindex][xindex]:
                 payTable[xindex][yindex] -= payTable[yindex][xindex]
                 payTable[yindex][xindex] = 0
+                addPayment(payTable[xindex][0], payTable[yindex][0], payTable[xindex][yindex], eventid)
             else:
                 payTable[yindex][xindex] -= payTable[xindex][yindex]
                 payTable[xindex][yindex] = 0
-    return payTable
+                addPayment(payTable[yindex][0], payTable[xindex][0], payTable[yindex][xindex], eventid)
+
+def addPayment(r_id, s_id, amt, e_id):
+    pay = Payment(recipient_id = r_id, sender_id = s_id, amount_cents = amt, event_id = e_id)
+    db.session.add(pay)
+    db.session.commit()
+
+@app.route('/api/user/<int:user_id>/event/<int:event_id>/paymentsdue', methods = ['GET'])
+@login_required
+def getPayments(user_id, event_id):
+    payments = Payments.query.filter(Payments.sender_id == user_id).filter(Payments.event_id == event_id).all()
+    user_payments = []
+    for payment in payments:
+        payment_dict = {}
+        payment_dict['recipient_id'] = payment.recipient_id
+        payment_dict['amount_cents'] = payment.amount_cents
+        payment_dict['event_id'] = event_id
+        user_payments.append(payment_dict)
+    return json.dumps(user_payments, default=dthandler)
 
 # Views
 @app.route('/')
