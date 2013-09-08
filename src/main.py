@@ -307,7 +307,9 @@ def add_user(eventid):
     user = User.query.filter(User.email == user_email).first()
     if not user:
         return json.dumps({'error' : True})
-    event = Event.query.filter(Event.id == eventid)
+    event = Event.query.filter(Event.id == eventid).first()
+    if not event:
+        return json.dumps({'error' : True, 'message' : 'jesus christ what did you doooooooo'})
     event.participants.append(user)
     db.session.add(event)
     db.session.commit()
