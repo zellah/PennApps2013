@@ -405,7 +405,7 @@ def settle():
 
     ##add money for each transaction
     partysize = participants.size + 1
-	payTable = zeros( (partysize, partysize), dtype=int16)
+    payTable = zeros( (partysize, partysize), dtype=int16)
     translation_number = 1
     for eventparticipant in eventparticipants:
         payTable[0][translation_number] = eventparticipant
@@ -428,13 +428,13 @@ def settle():
     ##calculate who owes money to whom
     for xindex in range(partysize):
         for yindex in range(xindex, partysize):
-			if payTable[xindex][yindex] > payTable[yindex][xindex]:
-				payTable[xindex][yindex] -= payTable[yindex][xindex]
-				payTable[yindex][xindex] = 0
-			else
-				payTable[yindex][xindex] -= payTable[xindex][yindex]
-				payTable[xindex][yindex] = 0
-	return payTable
+            if payTable[xindex][yindex] > payTable[yindex][xindex]:
+                payTable[xindex][yindex] -= payTable[yindex][xindex]
+                payTable[yindex][xindex] = 0
+            else:
+                payTable[yindex][xindex] -= payTable[xindex][yindex]
+                payTable[xindex][yindex] = 0
+    return payTable
 
 # Views
 @app.route('/')
