@@ -132,8 +132,7 @@ def get_events_from_userid(userid):
         for event in user.events], default=dthandler)
 
 def get_friends(userid):
-    conn = db.session.connection()
-    results = conn.execute(friends.select(friends.c.f1_id == userid)).fetchall()
+    results = db.session.execute(friends.select(friends.c.f1_id == userid)).fetchall()
     return [f2_id for f1_id, f2_id in results]
 
 @app.route('/api/transaction/<int:transid>', methods = ['GET'])
@@ -245,8 +244,7 @@ def edit_transaction(transid):
             for participant_id in v:
                 trans_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
         elif k == 'del_participants':
-            conn = db.session.connection()
-            conn.execute(transactions_users.delete().where(
+            db.session.execute(transactions_users.delete().where(
                 transactions_users.c.user_id.in_(v)).where(
                 transactions_users.c.transaction_id == trans_to_edit.id))
         else:
@@ -277,8 +275,7 @@ def edit_event(eventid):
             for participant_id in v:
                 event_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
         elif k == 'del_participants':
-            conn = db.session.connection()
-            conn.execute(events_users.delete().where(
+            db.session.execute(events_users.delete().where(
                 events_users.c.user_id.in_(v)).where(
                 events_users.c.event_id == event_to_edit.id))
         elif k == 'new_transactions':
@@ -342,8 +339,7 @@ def edit_user(userid):
                 user_to_edit.transactions.append(Transaction.query.filter(
                     Transaction.id == trans_id).one())
         elif k == 'del_transactions':
-            conn = db.session.connection()
-            conn.execute(transactions_users.delete().where(
+            db.session.execute(transactions_users.delete().where(
                 transactions_users.c.transaction_id.in_(v)).where(
                 transactions_users.c.user_id == user_to_edit.id))
         elif k == 'new_events':
@@ -356,8 +352,7 @@ def edit_user(userid):
                 new_event = Event.query.filter(Event.id == event_id).one()
                 user_to_edit.events.append(new_event)
         elif k == 'del_events':
-            conn = db.session.connection()
-            conn.execute(events_users.delete().where(
+            db.session.execute(events_users.delete().where(
                 events_users.c.event_id.in_(v)).where(
                 events_users.c.user_id == user_to_edit.id))
         else:
