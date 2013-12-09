@@ -428,43 +428,20 @@ def settle(eventid):
     ##find creator
     event = Event.query.filter(Event.id == eventid).first()
     creator = event.creator
+    users_to_debts = {}
 
-    ##find all users involved
-    participants = event.participants
+    for transaction in event.transactions:
+        transaction_amt = transaction.amount_cents
+        even_split = transaction_amt / len(transaction.participants)
+        for participant in transaction.participants:
+            if participant.id not in users_to_debts:
+                users_to_debts[participant.id] = {}
+            participant_debts = users_to_debts[participant.id]
+            if transaction.creator.id not in participant_debts:
+                participant_debts[transaction.creator.id] = 0
+            participant_debts[transaction.creator.id] += even_split
+    # now somehow deal with the debts?  look up the api?
 
-    ##add money for each transaction
-    partysize = participants.size + 1
-    payTable = zeros( (partysize, partysize), dtype=int16)
-    translation_number = 1
-    for eventparticipant in participants:
-        payTable[0][translation_number] = eventparticipant
-        payTable[translation_number][0] = eventparticipant
-    transactions = Transaction.query.filter(Transaction.event_id == eventid).all()
-    for transaction in transactions:
-        amount = transaction.amount_cents
-        transparticipants = transaction.participants
-        transpartysize = transparticipants.size
-        creator = transaction.creator
-        iou = amount/transpartysize
-        creatorIndex = 1
-        for index in range(partysize):
-            if (payTable[0][index] == creator):
-                creatorIndex = index
-        for index in range(partysize):
-            if (payTable[0][index] in transparticipants):
-                payTable[creatorIndex][index] += iou
-
-    ##calculate who owes money to whom/insert into payments table
-    for xindex in range(partysize):
-        for yindex in range(xindex, partysize):
-            if payTable[xindex][yindex] > payTable[yindex][xindex]:
-                payTable[xindex][yindex] -= payTable[yindex][xindex]
-                payTable[yindex][xindex] = 0
-                addPayment(payTable[xindex][0], payTable[yindex][0], payTable[xindex][yindex], eventid)
-            else:
-                payTable[yindex][xindex] -= payTable[xindex][yindex]
-                payTable[xindex][yindex] = 0
-                addPayment(payTable[yindex][0], payTable[xindex][0], payTable[yindex][xindex], eventid)
 
 def addPayment(r_id, s_id, amt, e_id):
     pay = Payment(recipient_id = r_id, sender_id = s_id, amount_cents = amt, event_id = e_id)
