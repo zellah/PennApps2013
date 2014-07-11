@@ -2,6 +2,7 @@ import datetime
 import os
 import json
 import numpy
+import requests
 from prettydate import pretty_date
 from flask import Flask, render_template, request
 from flask.ext.sqlalchemy import SQLAlchemy
@@ -60,6 +61,7 @@ class User(db.Model, UserMixin):
     friends = db.relationship('User', secondary=friends,
                             primaryjoin=friends.c.f1_id==id, secondaryjoin=friends.c.f2_id==id)
     venmo_key = db.Column(db.String(255))
+    venmo_id = db.Column(db.Integer)
 
 transactions_users = db.Table('transactions_users',
         db.Column('user_id', db.Integer(), db.ForeignKey('user.id')),
@@ -396,31 +398,29 @@ def edit_user(userid):
 def getAccessToken():
     code = request.args.get('code')
     values = {'code':code, 'client_id':client_id, 'client_secret':client_secret}
-    data = urllib.urlencode(values)
-    request = urllib2.Request('https://api.venmo.com/oauth/access_token')
-    try:
-        res = urllib2.urlopen(request, data)
-    except:
-        return 'Could not retrieve access_token', 405
-    rJson = simplejson.load(res)
-    access_token = rJson['access_token']
+    r = requests.post('https://api.venmo.com/oauth/access_token', params=values)
+    resp_json = r.json()
+    access_token = resp_json['access_token']
+    user_id = resp_json['user']['id']
     user = User.query.filter(User.id == current_user.id).one()
     user.venmo_key = access_token
+    user.venmo_id = user_id
     db.session.add(user)
     db.commit()
     return redirect(url_for('account'))
 
-@app.route('/api/venmo/pay', methods = ['POST'])
-def payUser(recipient_id, amount, user_id):
-    recipient_id = request.form.get(recipient_id)
-    amount = request.form.get(amount)
-    user_id = request.form.get(user_id)
+def schedule_transaction(recipient_id, amount, user_id):
     user = User.query.filter(User.id == user_id).one()
     access_token = user.venmo_key
-    data = urllib.urlencode({'access_token':"bZZCt4H3vbh5JgSXMBMh2mnUBT7hDb7a", 'user_id':user_id, "amount":amount})
-    request = urllib2.Request("https://sandbox-api.venmo.com/payments")
-    res = urllib2.urlopen(request, data)
+    user_venmo_id = user.venmo_id
+    values = {'access_token':access_token, 'user_id':user_venmo_id, "amount":amount, "note":"Paying with Reimburst!"}
+    r = requests.post("https://api.venmo.com/v1/payments", params=values)
+    transaction_result = json.loads(res)
 
+def venmo_error_check(request):
+    if request.status_code not requests.codes.ok:
+        #um
+        #panic
 
 @app.route('/api/venmo/settle/', methods = ['POST'])
 def settle(eventid):
