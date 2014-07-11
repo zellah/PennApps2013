@@ -250,7 +250,7 @@ def edit_transaction(transid):
             for participant_id in v:
                 trans_to_edit.participants.append(
                     User.query.filter(User.id == participant_id).one())
-        elif k == 'all_participants':
+        elif k == 'all_participants' or k == 'participants':
             del trans_to_edit.participants[:]
             for participant_id in v:
                 trans_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
