@@ -286,7 +286,7 @@ def edit_event(eventid):
             for participant_id in v:
                 event_to_edit.participants.append(
                     User.query.filter(User.id == participant_id).one())
-        elif k == 'all_participants':
+        elif k == 'all_participants' or k == 'participants':
             del event_to_edit.participants[:]
             for participant_id in v:
                 event_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
@@ -298,7 +298,7 @@ def edit_event(eventid):
             for trans_id in v:
                 event_to_edit.transactions.append(
                     Transaction.query.filter(Transaction.id == trans_id).one())
-        elif k == 'all_transactions':
+        elif k == 'all_transactions' or k == 'transactions':
             del event_to_edit.transactions[:]
             for trans_id in v:
                 event_to_edit.transactions.append(
@@ -308,8 +308,6 @@ def edit_event(eventid):
                 edit_trans = Transaction.query.filter(Transaction.id == trans_id).one()
                 edit_trans.event = None
                 db.session.add(edit_trans)
-        elif k == 'transactions' or k == 'participants':
-            return 'needs to be "new_transactions" or "all_participants" or whatever', 422
         else:
             setattr(event_to_edit, k, v)
     db.session.add(event_to_edit)
