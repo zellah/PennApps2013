@@ -130,7 +130,6 @@ def get_user_data(userid):
     if not user:
         return 'user not found', 404
     userdict = asdict(user)
-    del userdict['password']
     userdict['friends'] = get_friends(userid)
     return userdict
 
