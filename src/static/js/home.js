@@ -9,7 +9,6 @@ bindEventHandlers = function() {
     });
     $('#submit_add_event_button').click(function(){
         addEvent($('form#add_event_form').getFormData());
-        //TODO: redirect
     });
 }
 

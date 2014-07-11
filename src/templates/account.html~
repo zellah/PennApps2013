@@ -1,11 +1,23 @@
 {% extends "base.html" %}
 
 {% block content_body %}
-<div class=metanav>
-  {% if user.is_authenticated() %}
-    Create an event
-  {% else %}
-    <a href="{{ url_for('security.register') }}">Register</a>
-  {% endif %}
-  </div>
+<script>
+var userID = '{{ user.id }}';
+</script>
+<h1>Welcome, <span id="welcome">{{ user.name}}</span></h1>
+<div id="settings">
+  <h3>Account settings</h3>
+  Name: <input type="text" id="name" name="name" value="{{user.name}}">
+  <button type="button" id="name_button">Update</button><br/>
+  Email: <input type="text" id="email" name="email" value="{{user.email}}">
+  <button type="button" id="email_button">Update</button><br/>
+  <button type="button" id="venmo_button">Link Venmo account</button>
+</div>
+<div id="events">
+  
+</div>
 {% endblock content_body %}
+
+{% block load_js %}
+<script src="/static/js/account.js"></script>
+{% endblock load_js%}
