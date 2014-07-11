@@ -409,6 +409,45 @@ def get_access_token():
     user = User.query.filter(User.id == current_user.id).one()
     user.venmo_key = access_token
     db.session.add(user)
+    db.commit()
+    return redirect(url_for('account'))
+
+@app.route('/api/venmo/pay', methods = ['POST'])
+def payUser(recipient_id, amount, user_id):
+    recipient_id = request.form.get(recipient_id)
+    amount = request.form.get(amount)
+    user_id = request.form.get(user_id)
+    user = User.query.filter(User.id == user_id).one()
+    access_token = user.venmo_key
+    data = urllib.urlencode({'access_token':"bZZCt4H3vbh5JgSXMBMh2mnUBT7hDb7a", 'user_id':user_id, "amount":amount})
+    request = urllib2.Request("https://sandbox-api.venmo.com/payments")
+    res = urllib2.urlopen(request, data)
+
+
+@app.route('/api/venmo/settle/', methods = ['POST'])
+def settle(eventid):
+    eventid = request.form.get(eventid)
+    ##find creator
+    event = Event.query.filter(Event.id == eventid).first()
+    creator = event.creator
+    users_to_debts = {}
+
+    for transaction in event.transactions:
+        transaction_amt = transaction.amount_cents
+        even_split = transaction_amt / len(transaction.participants)
+        for participant in transaction.participants:
+            if participant.id not in users_to_debts:
+                users_to_debts[participant.id] = {}
+            participant_debts = users_to_debts[participant.id]
+            if transaction.creator.id not in participant_debts:
+                participant_debts[transaction.creator.id] = 0
+            participant_debts[transaction.creator.id] += even_split
+    # now somehow deal with the debts?  look up the api?
+
+
+def addPayment(r_id, s_id, amt, e_id):
+    pay = Payment(recipient_id = r_id, sender_id = s_id, amount_cents = amt, event_id = e_id)
+    db.session.add(pay)
     db.session.commit()
 
 @app.route('/api/venmo/settle', methods = ['POST'])
