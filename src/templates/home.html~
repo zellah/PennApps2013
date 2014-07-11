@@ -5,12 +5,22 @@
         <h1>{% block title %}Reimburst{% endblock title%}</h1>
         <p class="lead">Track group purchases and get reimbursed - easy, math-free, and instant through Venmo.</p>
       </div>
-    </div><!-- /.container -->
+    </div>
   <div class=metanav>
   {% if user.is_authenticated() %}
-    Create an event
+    <button type="button" id="add_event_button" class="btn btn-primary">Create a new event</button>
+    <form id="add_event_form" style="display: none">
+      Event name: <input type="text" name="name"><br/>
+      Description: <input type="text" name="description"><br/>
+      End date: <input type="text" name="end_date"><br/>
+      <button type="button" id="submit_add_event_button" class="btn btn-success">Create</button>
+    </form>
   {% else %}
     <a href="{{ url_for('security.register') }}">Register</a>
   {% endif %}
   </div>
 {% endblock content_body %}
+
+{% block load_js %}
+<script src="/static/js/home.js"></script>
+{% endblock load_js%}

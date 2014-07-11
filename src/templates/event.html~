@@ -1,32 +1,38 @@
 {% extends "base.html" %}
 
 {% block content_body %}
+<script>
+var eventID = '{{ eventID }}';
+</script>
 <div class=metanav>
-  <h1> Event title </h1>
-  <span id="add_trans"><button type="button" id="add_trans_button">Add Transaction</button>
-    <form id="add_trans_form" style="display: none">
-      I paid <input type="text" name="amount"><br/>
-      to <input type="text" name="vendor"><br/>
-      for <input type="text" name="description"><br/>
-      and 
-        <input type="checkbox" name="people" value="me" checked>Me
-        <input type="checkbox" name="people" value="you">You
-        <input type="checkbox" name="people" value="spiderman">Spiderman
-      benefitted.<br/>
-      <button type="button" id="submit_add_trans_button">Submit</button>
+  <h1> {{ event.name }} </h1>
+  <h4> {{ event.description }} </h4>
+  <span id="add_trans"><button type="button" id="add_trans_button" class="btn">Add Transaction</button>
+  <span id="add_user">
+    <button type="button" id="add_user_button" class="btn">Add Users</button>
+    <form id="add_trans_form" style="display: none"><div>
+      I spent $<input type="text" name="amount"><br/>
+      on <input type="text" name="description"><br/>
+      at <input type="text" name="vendor"><br/>
+      and <span id="participant_checkboxes"> </span> benefitted.<br/>
+      <button type="button" id="submit_add_trans_button" class="btn">Submit</button>
+      <button type="button" id="cancel_add_trans_button" class="btn">Cancel</button>
+    </div></form>
+    <form id="add_user_form" style="display: none">
+      User email: <input type="text" name="email" id="email">
+      <button type="button" id="submit_add_user_button" class="btn">Add</button>
+      <button type="button" id="cancel_add_user_button" class="btn">Cancel</button>
     </form>
   </span>
   <div id="running_bal">
     <span id="i_owe">I owe: </span>
     <span id="i_paid">I paid: </span>
   </div>
-  <div id="all_trans"></div><!--Added with js-->
-  <div id="settle_now">Settle Now</div>
-  <div id="bottom_bar">Add people  Edit Settings</div>
+  <div id="all_trans"></div>
+  <span id="settle_now"><button type="button" id="settle_now_button" class="btn btn-primary">Settle Now</button>
 </div>
 {% endblock content_body %}
 
 {% block load_js %}
 <script src="/static/js/event.js"></script>
-<script type=text/javascript src="{{ url_for('static', filename='jquery.js') }}"></script>
 {% endblock load_js%}

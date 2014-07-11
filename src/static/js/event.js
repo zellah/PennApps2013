@@ -1,11 +1,17 @@
 var eventData;
+var users=[];
+var selectUsers="";
 
 renderEventPage = function() {
     bindEventHandlers();
     $.getJSON("/api/event/"+eventID, function(data){
-        console.log(data.transactions);
         eventData = data;
-        renderTransactions(); 
+        renderTransactions();
+        //add users to global users var
+        for (var i=0; i<eventData.participants.length; i++) {
+            users[i]=(eventData.participants[i].name);
+        }
+        $('#participant_checkboxes').html(genSelectUsers());
     });
 }
 
@@ -32,10 +38,25 @@ bindTransHandlers = function() {
             $(this).parent().find('#collapse_trans').toggle("fast");
         })
         .on("click", '#edit_trans_button', function(){
-            $(this).parent().find('div#trans_view').hide();
-            $(this).parent().find('div#trans_edit').show();
+            $(this).parent().find('div#trans_view').hide('slow');
+            $(this).parent().find('div#trans_edit').show('slow');
             $(this).parent().find('#edit_trans_button').hide();
-            $(this).parent().find('#edit_trans_button_submit').show();
+            $(this).parent().find('#edit_trans_button_submit').show('fast');
+            $(this).parent().find('#edit_trans_button_cancel').show('fast');
+            $(this).parent().find('#del_trans_button').show('fast');
+        })
+        .on("click", '#edit_trans_button_cancel', function(){
+            $(this).parent().find('div#trans_view').show('slow');
+            $(this).parent().find('div#trans_edit').hide('slow');
+            $(this).parent().find('#edit_trans_button').show('fast');
+            $(this).parent().find('#edit_trans_button_submit').hide();
+            $(this).parent().find('#edit_trans_button_cancel').hide();
+            $(this).parent().find('#del_trans_button').hide();
+        })
+        .on("click", '#del_trans_button', function(){
+            var $form =$(this).parent().parent().find('form#edit_trans_form'),
+                formData = $form.getFormData();
+            delTrans(formData.id);
         })
         .on("click", '#edit_trans_button_submit', function(){
             //TODO: later check if form was changed, for now don't bother
@@ -43,10 +64,12 @@ bindTransHandlers = function() {
                 $form =el.parent().find('form#edit_trans_form'),
                 formData = $form.getFormData();
             //toggle relevant display pieces
-            el.find('div#trans_view').show();
-            el.find('div#trans_edit').hide();
-            el.find('#edit_trans_button').show();
+            el.find('div#trans_view').show('slow');
+            el.find('div#trans_edit').hide('slow');
+            el.find('#edit_trans_button').show('fast');
             el.find('#edit_trans_button_submit').hide();
+            el.find('#edit_trans_button_cancel').hide();
+            el.find('#del_trans_button').hide();
             //convert amount into cents and submit form over ajax
             var loc = formData.amount.indexOf(".");
             if (loc != -1) {
@@ -64,6 +87,21 @@ bindEventHandlers = function() {
     $('#add_trans_button').click(function(){
         $('#add_trans_form').show('slow');
     });
+    $('#add_trans_button_cancel').click(function(){
+        $('#add_trans_form').hide('slow');
+    });
+    $('#add_user_button').click(function(){
+        $('#add_user_form').show('slow');
+    });
+    $('#cancel_add_user_button').click(function(){
+        $('#add_user_form').hide('slow');
+    });
+    $('#submit_add_user_button').click(function(){
+        tryAddUser($('input#email').val());
+    });
+    $('#cancel_add_trans_button').click(function(){
+        $('form#add_trans_form').hide('slow');
+    });
     $('#submit_add_trans_button').click(function(){
         var $form =$('form#add_trans_form'),
             formData = $form.getFormData();
@@ -79,15 +117,31 @@ bindEventHandlers = function() {
         submitTrans(formData);
     });
     //TODO: js input verification onKeyUp in these inputs
-    
-    
+}
+
+tryAddUser = function(email) {
+    //ajax call to /api/transaction
+    $.post("/api/event/"+eventID+"/adduser", {email:email}, function(retVal) {
+        retVal = $.parseJSON(retVal);
+        console.log(retVal);
+        tryAddUserCallback(retVal);
+    });
+}
+
+tryAddUserCallback = function(retVal) {
+    console.log(retVal.error);
+    if (retVal.error) {
+        alert("No user with that email address exists in our database.");
+    } else {
+        //TODO: add user to all trans inputs
+    }
 }
 
 submitTrans = function(formData) {
     //ajax call to /api/transaction
     formData.event_id = eventID;
     delete formData.amount;
-    $.post("/api/transaction", formData, function(newTransData) {
+    $.post("/api/transaction", formData, function(newTransData){
         submitTransCallback(newTransData);
     });
 }
@@ -95,10 +149,12 @@ submitTrans = function(formData) {
 editTrans = function(data) {
     //ajax call to /api/transaction/<id>
     data.event_id = eventID;
-    $.post("/api/transaction/"+data.id, data, function(data) {
-        editTransCallback(data);
+
+console.log(data);
+
+    $.post("/api/transaction/"+data.id, data, function(newTransData){
+        editTransCallback(newTransData);
     });
-    
 }
 
 submitTransCallback = function(newTransData){
@@ -128,6 +184,15 @@ editTransCallback = function(returnData){
     var amtStr = returnData.amount_cents.toString();
     $el.find('span#trans_amount').text(amtStr.slice(0,-2)+"."+amtStr.substring(amtStr.length-2, amtStr.length));
     $el.find('span#trans_vendor').text(returnData.vendor);
+    $el.find('span#trans_desc').text(returnData.description);
+}
+
+delTrans = function(transID){
+    //TODO: confirm desire to delete
+    data = {'del_transactions':transID};
+    $.post("/api/event/"+eventData.id, data, function(returnData){
+        $('div#trans_id_'+transID).remove()
+    })
 }
 
 $.fn.getFormData = function() {
@@ -146,29 +211,63 @@ $.fn.getFormData = function() {
     return o;
 }
 
+genSelectUsers = function() {
+    var htmlString="";
+    for (var i=0; i<eventData.participants.length; i++) {
+            htmlString+= '<input type="checkbox" name="participants" value="'
+                    +eventData.participants[i].id+'" checked>'
+                    +eventData.participants[i].name;
+    }
+    selectUsers = htmlString;
+    return selectUsers;
+}
+
+var myData;
+
+genTransSelect = function(participants) {
+    myData = participants;
+    var htmlString="";
+    for (var i=0; i<eventData.participants.length; i++) {
+            htmlString+= '<input type="checkbox" name="participants" value="'
+                    +eventData.participants[i].id+'"';
+            for (var j=0; j<participants.length; j++){
+                if (participants[j].id == eventData.participants[i].id){
+                    htmlString+=' checked';
+                }
+            }
+            htmlString+= '>'+eventData.participants[i].name+' ';
+    }
+    return htmlString;
+}
+
 transTemplate = function(data){
-    return '<span id="trans_desc"><h3>'+data.description+'   $<span id="trans_amount">'+data.amount
+    var select = genTransSelect(data.participants);
+    return '<span id="trans_desc" class=""><h3>'
+        +'<span id="trans_desc">'+data.description+'</span>'
+        +'   $<span id="trans_amount">'+data.amount
         +'</span>   <span class="smallH3" style="font-size:10px">'+data.created+'</span></h3></span>'
         //collapsed info
         +'<div id="collapse_trans" style="display: none">'
         +'<div id="trans_view">'
-            +'On <span id="trans_date">'+data.created+'</span>, '
             +'<span id="trans_creator">'+data.creator.name+'</span> spent '
             +'$<span id="trans_amount">'+data.amount+'</span> at '
             +'<span id="trans_vendor">'+data.vendor+'</span> on '
-            +'<span id="trans_desc">'+data.description+'</span>'
+            +'<span id="trans_descr">'+data.description+'</span>'
         +'</div>'
         //edit form
         +'<div id="trans_edit" data-node-value='+data.id+' style="display: none">'
         +'<form id="edit_trans_form">'
             +'<input type="hidden" name="id" value="'+data.id+'">'
             +'<span id="trans_creator">'+data.creator.name+'</span> spent '
-            +'$<input type="text" name="amount" value="'+data.amount+'"> at '
-            +'<input type="text" name="vendor" value="'+data.vendor+'">'
-            //TODO: edit description
+            +'$<input type="text" name="amount" value="'+data.amount+'"></br>on '
+            +'<input type="text" name="description" value="'+data.description+'"></br>at '
+            +'<input type="text" name="vendor" value="'+data.vendor+'"><br/>for '
+            +select
         +'</form></div>'
-        +'<button type="button" id="edit_trans_button">Edit</button>'
-        +'<button type="button" id="edit_trans_button_submit" style="display: none">Submit</button>'
+        +'<button type="button" id="edit_trans_button" class="btn btn-mini">Edit</button>'
+        +'<button type="button" id="edit_trans_button_submit" class="btn btn-mini" style="display: none">Submit</button>    '
+        +'<button type="button" id="edit_trans_button_cancel" class="btn btn-mini" style="display: none">Cancel</button>    '
+        +'<button type="button" id="del_trans_button" class="btn btn-mini" style="display: none">Delete</button>    '   
         +'</div>';
 }
 
