@@ -22,13 +22,18 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///%s/app.db' % (os.path.abspath
 app.config['SECURITY_REGISTERABLE'] = True
 app.config['SECURITY_CHANGEABLE'] = True
 app.config['SECURITY_SEND_REGISTER_EMAIL'] = False
+app.config['VENMO_CLIENT_ID'] = 1454
+app.config['VENMO_SECRET'] = "CFELT3xea29gtWFk7ujfTcDh8bMTzJZ8"
+
+COLUMN_BLACKLIST = ["password", "venmo_key"]
 
 # Create database connection object
 db = SQLAlchemy(app)
 
 def asdict(obj):
     return dict((col.name, getattr(obj, col.name))
-                for col in class_mapper(obj.__class__).mapped_table.c)
+                for col in class_mapper(obj.__class__).mapped_table.c
+                    if col.name not in COLUMN_BLACKLIST)
 
 # Define models
 roles_users = db.Table('roles_users',
@@ -281,7 +286,7 @@ def edit_event(eventid):
             for participant_id in v:
                 event_to_edit.participants.append(
                     User.query.filter(User.id == participant_id).one())
-        elif k == 'all_participants':
+        elif k == 'all_participants' or k == 'participants':
             del event_to_edit.participants[:]
             for participant_id in v:
                 event_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
@@ -293,7 +298,7 @@ def edit_event(eventid):
             for trans_id in v:
                 event_to_edit.transactions.append(
                     Transaction.query.filter(Transaction.id == trans_id).one())
-        elif k == 'all_transactions':
+        elif k == 'all_transactions' or k == 'transactions':
             del event_to_edit.transactions[:]
             for trans_id in v:
                 event_to_edit.transactions.append(
@@ -303,8 +308,6 @@ def edit_event(eventid):
                 edit_trans = Transaction.query.filter(Transaction.id == trans_id).one()
                 edit_trans.event = None
                 db.session.add(edit_trans)
-        elif k == 'transactions' or k == 'participants':
-            return 'needs to be "new_transactions" or "all_participants" or whatever', 422
         else:
             setattr(event_to_edit, k, v)
     db.session.add(event_to_edit)
@@ -393,17 +396,17 @@ def edit_user(userid):
 #Venmo
 @app.route('/api/venmo/accesstoken', methods = ['GET'])
 @login_required
-def getAccessToken():
-    code = request.args.get('code')
-    values = {'code':code, 'client_id':client_id, 'client_secret':client_secret}
-    data = urllib.urlencode(values)
-    request = urllib2.Request('https://api.venmo.com/oauth/access_token')
-    try:
-        res = urllib2.urlopen(request, data)
-    except:
-        return 'Could not retrieve access_token', 405
-    rJson = simplejson.load(res)
-    access_token = rJson['access_token']
+def get_access_token():
+    AUTHORIZATION_CODE = request.args.get('code')
+    data = {
+        "client_id":app.config['VENMO_CLIENT_ID'],
+        "client_secret":app.config['VENMO_SECRET'],
+        "code":AUTHORIZATION_CODE
+        }
+    url = "https://api.venmo.com/oauth/access_token"
+    response = requests.post(url, data)
+    response_dict = response.json()
+    access_token = response_dict.get('access_token')
     user = User.query.filter(User.id == current_user.id).one()
     user.venmo_key = access_token
     db.session.add(user)
@@ -448,9 +451,51 @@ def addPayment(r_id, s_id, amt, e_id):
     db.session.add(pay)
     db.session.commit()
 
+@app.route('/api/venmo/settle', methods = ['POST'])
+def settle():
+    eventid = request.form.get('eventid')
+    event = Events.query.filter(Events.id == eventid).one()
+    if event.settled:
+        return "Event already settled.", 400
+    users_to_payments = {}
+    users_to_owed_amt = {}
+    for transaction in event.transactions:
+        if transaction.creator_id not in users_to_payments:
+            users_to_payments[transaction.creator.id] = 0
+        users_to_payments[transaction.creator.id] += transaction.amount_cents
+        for participant_id in [x.id for x in transaction.participants]:
+            if participant_id not in users_to_owed_amt:
+                users_to_owed_amt[participant_id] = 0
+            users_to_owed_amt[participant_id] = transaction.amount_cents / len(transaction.participants)
+    users_to_total_diff = {}
+    for user, amt in users_to_payments.items():
+        users_to_total_diff[user] = amt
+    for user, amt in users_to_owed_amt.items():
+        users_to_total_diff[user] = user_to_total_diff.get(user, 0) - amt
+    for user in users_to_total_diff:
+        if users_to_total_diff[user] > 0:
+            to_resolve = users_to_total_diff[user]
+            for otheruser, amt in users_to_total_diff.items():
+                if amt < 0:
+                    if -amt >= to_resolve:
+                        schedule_transaction(otheruser, user, to_resolve)
+                        to_resolve = 0
+                        users_to_total_diff[otheruser] += to_resolve
+                        users_to_total_diff[user] -= to_resolve
+                        break
+                    else:
+                        schedule_transaction(otheruser, user, amt)
+                        to_resolve -= amt
+                        users_to_total_diff[otheruser] += amt
+                        users_to_total_diff[user] -= amt
+    event.settled = True
+    db.session.add(event)
+    db.session.commit()
+    return 'BAM!  RESOLVED!'
+
 @app.route('/api/user/<int:user_id>/event/<int:event_id>/paymentsdue', methods = ['GET'])
 @login_required
-def getPayments(user_id, event_id):
+def get_payments(user_id, event_id):
     payments = Payments.query.filter(Payments.sender_id == user_id).filter(Payments.event_id == event_id).all()
     user_payments = []
     for payment in payments:
