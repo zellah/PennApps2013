@@ -25,12 +25,15 @@ app.config['SECURITY_SEND_REGISTER_EMAIL'] = False
 app.config['VENMO_CLIENT_ID'] = 1454
 app.config['VENMO_SECRET'] = "CFELT3xea29gtWFk7ujfTcDh8bMTzJZ8"
 
+COLUMN_BLACKLIST = ["password", "venmo_key"]
+
 # Create database connection object
 db = SQLAlchemy(app)
 
 def asdict(obj):
     return dict((col.name, getattr(obj, col.name))
-                for col in class_mapper(obj.__class__).mapped_table.c)
+                for col in class_mapper(obj.__class__).mapped_table.c
+                    if col.name not in COLUMN_BLACKLIST)
 
 # Define models
 roles_users = db.Table('roles_users',
@@ -252,7 +255,7 @@ def edit_transaction(transid):
             for participant_id in v:
                 trans_to_edit.participants.append(
                     User.query.filter(User.id == participant_id).one())
-        elif k == 'all_participants':
+        elif k == 'all_participants' or k == 'participants':
             del trans_to_edit.participants[:]
             for participant_id in v:
                 trans_to_edit.participants.append(User.query.filter(User.id == participant_id).one())
